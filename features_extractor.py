@@ -26,7 +26,15 @@ def tar(signal):
     return np.sum(signal)
 
 #TODO: Average absolute signal slope
-# def aass(signal):
+
+time = 3
+freq = 256
+n_probes = time*freq
+r = time/n_probes
+
+def aass(signal,r,n_probes):
+    return np.sum([np.abs((signal[n+1])-signal[n])/r for
+                  n in range(n_probes-1)])/n_probes
 
 def pp(signal):
     return np.max(signal)-np.min(signal)
@@ -44,3 +52,5 @@ def zcd(signal):
 
 #TODO: Slope sign alterations
 # def SSA(signal):
+# SSA:
+# np.sum( 0.5 * ( np.abs( ([signal[n-1]-signal[n])/np.abs(signal[n-1]-signal[n]) + for ] )))
