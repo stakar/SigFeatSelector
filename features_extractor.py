@@ -1,56 +1,94 @@
 #Signal Features extractor project
 import numpy as np
 
-def lat(signal):
-    return np.argmax(np.abs(signal))
+class Chromosome():
 
-def amp(signal):
-    return signal[np.argmax(np.abs(signal))]
+    def __init__(self,signal,freq):
 
-def lar(signal):
-    return lat(signal)/amp(signal)
+        self = self
+        self.signal = Signal
+        self.freq = freq
 
-def aamp(signal):
-    return np.max(np.abs(signal))
+    def fit(array):
+        pass
 
-def alar(signal):
-    return np.abs(lar(signal))
+    def lat(self):
+        """ Returns latency of signal """
+        return np.argmax(np.abs(self.signal))
 
-def par(signal):
-    return np.sum([n for n in signal if n > 0])
+    def amp(self):
+        """ Returns amplitude of signal """
+        return self.signal[np.argmax(np.abs(sself.signal))]
 
-def nar(signal):
-    return np.sum([n for n in signal if n < 0])
+    def lar(self):
+        """ Returns latency to amplitude ratio """
+        return self.lat(self.signal)/self.amp(self.signal)
 
-def tar(signal):
-    return np.sum(signal)
+    def aamp(self):
+        """ Returns absolute amplitude of signal """
+        return np.max(np.abs(self.signal))
 
-time = 3
-freq = 256
+    def alar(self):
+        """ Returns an absolute latency to amplitude ratio  """
+        return np.abs(self.lar(self.signal))
 
-def aass(signal,freq):
-    n_probes = len(signal)
-    r = 1/freq
-    return np.sum([np.abs((signal[n+1])-signal[n])/r for
-                  n in range(n_probes-1)])/n_probes
+    def par(self):
+        """ Returns positive area, sum of positive values of signal """
+        return np.sum([n for n in self.signal if n > 0])
 
-def pp(signal):
-    return np.max(signal)-np.min(signal)
+    def nar(self):
+        """ Returns negative area, sum of negative values of signal """
+        return np.sum([n for n in self.signal if n < 0])
 
-def ppt(signal):
-    return np.argmax(signal)-argmin(signal)
+    def tar(self):
+        """ Returns total area, sum of all values of signal """
+        return np.sum(self.signal)
 
-def zc(signal):
-    return np.count_nonzero(np.where(np.diff(np.sign(signal)))[0])
-    #Solution taken from stack overflow
+    def atar(self):
+        """ Returns absolute total area """
+        return np.abs(self.tar())
 
-def zcd(signal):
-    return np.count_nonzero(np.where(np.diff(np.sign(signal)))[0])/pp(signal)
-    #Solution taken from stack overflow
+    def taar(signal):
+        """ Returns total absolute area """
+        return np.sum(np.abs(self.signal))
 
-#TODO: Slope sign alterationsdef SSA(signal):
-def SSA(signal):
-    return np.sum(0.5 *(np.abs(
-    [((signal[n-1]-signal[n])/np.abs(
-    signal[n-1]-signal[n]) + (signal[n+1]-signal[n])/np.abs(
-    signal[n+1]-signal[n])) for n in range(len(signal)-1)] )))
+    def aass(self):
+        """ Returns average absolute signal slope """
+        n_probes = len(self.signal)
+        r = 1/self.freq
+        return np.sum([np.abs((self.signal[n+1])-self.signal[n])/r for
+                      n in range(n_probes-1)])/n_probes
+
+    def pp(self):
+        """ Returns peak-to-peak """
+        return np.max(self.signal)-np.min(self.signal)
+
+    def ppt(self):
+        """ Returns peak-to-peak time window """
+        return np.argmax(self.signal)-argmin(self.signal)
+
+    def pps(self):
+        """ Returns peak-to-peak slope """
+        return self.pp()/self.ppt()
+
+    def zc(self):
+        """ Returns zero crossings """
+        return np.count_nonzero(np.where(np.diff(np.sign(self.signal)))[0])
+        #Solution taken from stack overflow
+        # https://stackoverflow.com/questions/3843017/efficiently-detect-sign-ch
+        # anges-in-python
+
+    def zcd(self):
+        """ Returns zero crossings density """
+        return np.count_nonzero(np.where(
+                                np.diff(np.sign(self.signal)))[0])/self.pp()
+        #Solution taken from stack overflow
+
+    #TODO: Slope sign alterationsdef SSA(signal):
+    def SSA(self):
+        """ Returns slope signs alterations """
+        signal = self.signal.copy()
+        return np.sum(0.5 *(np.abs(
+        [((signal[n-1]-signal[n])/np.abs(
+        signal[n-1]-signal[n]) + (signal[n+1]-signal[n])/np.abs(
+        signal[n+1]-signal[n])) for n in range(len(signal)-1)] )))
