@@ -5,14 +5,13 @@ from sklearn.neural_network import MLPClassifier
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import cross_val_score
-
-
+import pickle
 
 
 class GenAlFeaturesSelector(object):
 
     def __init__(self,n_features=10,n_population=10,n_genotype=17,
-                 mutation_probability=0.02,desired_fitness=0.3):
+                 mutation_probability=0.02,desired_fitness=0.9,kfold = 5):
 
         """
         Features selector that uses Genetic Algorithm.
@@ -35,10 +34,12 @@ class GenAlFeaturesSelector(object):
         self.n_features = n_features
         self.n_population = n_population
         self.n_genotype = n_genotype
-        self.population = np.zeros((n_population,n_genotype))
         self.mlp = MLPClassifier()
         self.mutation_probability = mutation_probability
         self.desired_fitness = desired_fitness
+
+        self.hall_of_fame = []
+        self.kfold = kfold
 
     @staticmethod
     def get_gene():
@@ -56,8 +57,23 @@ class GenAlFeaturesSelector(object):
         offline data, consists of samples, i.e. transformed by BakardjianSystem
         EEG signal
 
+        target : array [n_samples,]
+
+        target, i.e. which stimuli was presented for each sample
+
+        Attributes
+        ----------
+
+        population : array
+        first, randomly generated population
+
+        val_ranges : tuple(array,array)
+
+        ranges of data, used for cross validation
+
         """
         #Firstly, let's shuffle the data
+        self.population = np.zeros((self.n_population,self.n_genotype))
         order = np.random.permutation(np.arange(data.shape[0]))
         self.data = data[order]
         self.target = target[order]
@@ -67,26 +83,56 @@ class GenAlFeaturesSelector(object):
             self.population[n][np.random.randint(0,self.n_genotype,
                                self.n_features)] = self.get_gene()
 
-    def _check_fitness(self,genotype):
-        """ Check the fitness of given individual, by creating a new dataset,
-        that uses selected features, fitting it to the MultiLayerPreceptron
-        and checking how well it performs on train part, returning accuracy"""
+        self.val_ranges = self.cvalidation_ranges()
+
+
+    def cvalidation_ranges(self):
+        """ Generates a ranges of chunks for cross validation """
+        full_range = np.arange(0,self.data.shape[0])
+        chunk = int(data.shape[0]/self.kfold)
+        test_chunks = list()
+        train_chunks = list()
+        for n in range(self.kfold):
+            test = np.arange(chunk*n,chunk*(n+1))
+            train = np.delete(full_range,test)
+            test_chunks.append(test)
+            train_chunks.append(train)
+        return train_chunks,test_chunks
+
+    def fenotype(self,genotype):
         #create Chromosome object, with genotype of individual
         chrom = Chromosome(genotype = genotype)
         #create train dataset that uses features of individual
         fen_train = np.array([chrom.fit_transform(self.data[n])
                              for n in range(self.data.shape[0])])
+        #crate a placeholder for classifiers
+        classifiers = list()
+        for train in self.val_ranges[0]:
+            self.mlp.fit(self.data[train],self.target[train])
+            classifiers.append(self.mlp)
+        return classifiers
 
-        #fit the neural network to the data
-        # self.mlp.fit(fen_train,self.train_target)
-        #return fitness, i.e accuracy of model
-        # return self.mlp.score(fen_test,self.test_target)
-        return np.round(np.mean(cross_val_score(self.mlp,fen_train,self.target,cv=5)),2)
+
+    def _check_fitness(self,fenotype):
+        """ Check the fitness of given individual, by creating a new dataset,
+        that uses selected features, fitting it to the MultiLayerPreceptron
+        and checking how well it performs on train part, returning accuracy"""
+
+        scores = np.zeros(self.kfold)
+        for n in range(self.kfold):
+            tmp = fenotype[n].score(self.data[self.val_ranges[1][n]],
+                                    self.target[self.val_ranges[1][n]])
+            # print(np.unique(self.target[self.val_ranges[1][n]]))
+            scores[n] = tmp
+            # print(tmp)
+        return np.round(np.mean(scores),2)
 
     def _population_fitness(self,population):
         """ Checks the fitness for each individual in population, then returns
         it """
-        return np.array([self._check_fitness(n) for n in population])
+        self.population_fitness = np.array([self._check_fitness(n)
+                                            for n in self.population_fenotype])
+        return self.population_fitness
 
 
     @staticmethod
@@ -100,19 +146,22 @@ class GenAlFeaturesSelector(object):
 
     def transform(self):
         """ Transform, i.e. execute an algorithm. """
+        self.population_fenotype = [self.fenotype(n) for n in self.population]
         self.past_populations = self._population_fitness(self.population)
-        best_fitness = np.max(self.past_populations)
+        self.best_fitness = np.max(self.past_populations)
         self.n_generation = 0
-        for n in range(3):
+        for n in range(5):
 
         # For check, how does an algorithm performs, comment out line above,
         # and comment line below.
 
-        # while best_fitness > self.desired_fitness:
+        # while self.best_fitness < self.desired_fitness:
             self.descendants_generation()
             self.random_mutation()
             self.n_generation += 1
-            best_fitness = np.max(self._population_fitness(self.population))
+            self.best_fitness = np.max(self._population_fitness(self.population))
+
+
 
     def descendants_generation(self):
         """ Selects the best individuals, then generates new population, with
@@ -121,10 +170,11 @@ class GenAlFeaturesSelector(object):
         #Two firsts individuals in descendants generation are the best individua
         #ls from previous generation
         pop_fit = self._population_fitness(self.population)
-
         self.past_populations = np.vstack([self.past_populations,pop_fit])
-        self.population[:2] = self.population[np.argsort(pop_fit)][:2]
         #now,let's select best ones
+        self.population[:2] = self.population[np.argsort(pop_fit)][:2]
+        self.population_fenotype[0] = self.population_fenotype[np.argsort(pop_fit).tolist()[0]]
+        self.population_fenotype[1] = self.population_fenotype[np.argsort(pop_fit).tolist()[1]]
         parents_pop = self.roulette()
         #Finally, we populate new generation by pairing randomly chosen best
         #individuals
@@ -134,6 +184,8 @@ class GenAlFeaturesSelector(object):
                 children = self._pairing(mother,father)
                 self.population[(n)] = children[0]
                 self.population[(n)+1] = children[1]
+                self.population_fenotype[n] = self.fenotype(self.population[n])
+                self.population_fenotype[n] = self.fenotype(self.population[n+1])
 
     def random_mutation(self):
         """ Randomly mutates the population, for each individual it checks wheth
@@ -217,7 +269,10 @@ if __name__ == '__main__':
     print(data.shape)
     ga.fit(data,target)
     print(ga.population)
-    ga.transform()
+    fenotype = ga.fenotype(ga.population[0])
+    print(ga._check_fitness(fenotype))
+    print(ga.mlp)
+    # ga.transform()
     # print(ga._population_fitness(ga.population))
     # ga.plot_fitness()
 
@@ -225,6 +280,5 @@ if __name__ == '__main__':
 """
 ToDo:
 
-IDEA: Let's pickle the best individual!!!
-
+self._check_fitness works differently for each individual than _population_fitness, fix it
 """
