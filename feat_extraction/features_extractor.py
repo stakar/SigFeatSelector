@@ -42,16 +42,17 @@ class Chromosome():
         self.par,self.nar,self.tar,self.atar,self.taar,self.aass,
         self.pp,self.ppt,self.pps,self.zc,self.zcd,self.ssa]
 
-        self.chromosome = [genes[n]() for n in range(17) if self.genotype[n] > 0]
+        self.chromosome = [round(genes[n](),2) for n in
+                           range(17) if self.genotype[n] > 0]
 
-    def transform(self):
+    def transform(self,signal):
         """ Returns chromosome """
         return self.chromosome
 
     def fit_transform(self,signal):
         """ Fits the model to data and returns chromosome """
         self.fit(signal)
-        return self.transform()
+        return self.transform(signal)
 
     def lat(self):
         """ Returns latency of signal """
