@@ -1,17 +1,20 @@
 from BakSys.BakSys import BakardjianSystem as BakSys
 from feat_extraction.dataset_manipulation import *
 from feat_extraction.features_extractor import Chromosome
+from sklearn.preprocessing import *
 from sklearn.neural_network import MLPClassifier
-import numpy as np
+from sklearn.pipeline import make_pipeline
 import matplotlib.pyplot as plt
+import numpy as np
 from sklearn.model_selection import cross_val_score
 import pickle
 
 
 class GenAlFeaturesSelector(object):
 
-    def __init__(self,n_features=10,n_population=10,n_genotype=17,
-                 mutation_probability=0.02,desired_fitness=0.8,kfold = 5):
+    def __init__(self,n_features=10,n_pop=10,n_genotype=17,
+                 mut_prob=0.02,desired_fit=0.9,kfold = 5,
+                 scaler = MinMaxScaler(),clf = MLPClassifier()):
 
         """
         Features selector that uses Genetic Algorithm.
@@ -20,7 +23,7 @@ class GenAlFeaturesSelector(object):
         number of features that are supposed to be extracted once fit method is
         used
 
-        n_population : int
+        n_pop : int
         number of individuals in population
 
         n_genotype : int
@@ -28,24 +31,31 @@ class GenAlFeaturesSelector(object):
         n select in fact, it is determined by maximal length of Chro
         mosome's attribute genotype.
 
-        mutation_probability : float
+        mut_prob : float
         Probability of random mutation in each generation
 
-        desired_fitness : float
+        desired_fit : float
         fitness that must be achieved for an algorithm to stop
 
         kfold : int
         number of folds for cross validation
 
+        scaler : class
+        scaler used in pipeline
+
+
+
         """
 
         self.self = self
         self.n_features = n_features
-        self.n_population = n_population
+        self.n_pop = n_pop
         self.n_genotype = n_genotype
-        self.mlp = MLPClassifier()
-        self.mutation_probability = mutation_probability
-        self.desired_fitness = desired_fitness
+        self.scaler = scaler
+        self.clf = clf
+        self.mlp = make_pipeline(self.scaler,)
+        self.mut_prob = mut_prob
+        self.desired_fit = desired_fit
         self.kfold = kfold
 
     @staticmethod
@@ -60,12 +70,10 @@ class GenAlFeaturesSelector(object):
         ----------
 
         data : array [n_samples,frequency*time_window]
-
         offline data, consists of samples, i.e. transformed by BakardjianSystem
         EEG signal
 
         target : array [n_samples,]
-
         target, i.e. which stimuli was presented for each sample
 
         Attributes
@@ -79,18 +87,22 @@ class GenAlFeaturesSelector(object):
 
         """
         #Firstly, let's shuffle the data
-        self.population = np.zeros((self.n_population,self.n_genotype))
-        order = np.random.permutation(np.arange(data.shape[0]))
-        self.data = data[order]
-        self.target = target[order]
+        self.pop = np.zeros((self.n_pop,self.n_genotype))
+        self._order = np.random.permutation(np.arange(data.shape[0]))
+        self.data = data[self._order]
+        self.target = target[self._order]
 
-        #Creates a random population
-        for n in range(self.n_population):
-            self.population[n][np.random.randint(0,self.n_genotype,
+        #Create a random population
+        for n in range(self.n_pop):
+            self.pop[n][np.random.randint(0,self.n_genotype,
                                self.n_features)] = self.get_gene()
-
+        #create a cross validation ranges of data
         self.val_ranges = self.cvalidation_ranges()
 
+    def fit_transform(self,data,target):
+        """ Fits the data to model, then executes an algorithm. """
+        self.fit(data,target)
+        self.transform()
 
     def cvalidation_ranges(self):
         """ Generates a ranges of chunks for cross validationself.
@@ -98,9 +110,13 @@ class GenAlFeaturesSelector(object):
         Takes a shape of data and divides it into chunks according to number of
         folds, given in kfold attribute. Generates a list of ranges for each
         train/test session.
+
+        Output : tuple (list,list)
+        Returns a tuple of list off ranges for train sessions, and list of range
+        s for test sessions
         """
         full_range = np.arange(0,self.data.shape[0])
-        chunk = int(data.shape[0]/self.kfold)
+        chunk = int(self.data.shape[0]/self.kfold)
         test_chunks = list()
         train_chunks = list()
         for n in range(self.kfold):
@@ -147,26 +163,33 @@ class GenAlFeaturesSelector(object):
             tmp = fenotype[fold].score(individual[self.val_ranges[1][fold]],
                                     self.target[self.val_ranges[1][fold]])
             scores[fold] = tmp
-        return np.round(np.mean(scores),2)
+        return  np.round(np.mean(scores),2)
 
-    def _population_fitness(self,population):
+
+
+    def _pop_fit(self,population):
         """ Checks the fitness for each individual in population, then returns
         it """
         #create placeholder for each individual's fitness
-        self.population_fitness = np.zeros(self.n_population)
+        self.pop_fit = np.zeros(self.n_pop)
         #for each individual in population:
-        for n in range(self.n_population):
-        # for n in range(1):
+        for n in range(self.n_pop):
             #decode genotype into dataset
             # ind = self._individual(population[n])
-            ind =self.population_individuals[n]
+            ind =self.pop_ind[n]
             #take it's fenotype, i.e. classifiers
             # fen = self.fenotype(ind)
-            fen = self.population_fenotype[n]
+            fen = self.pop_fen[n]
             #check it's fitness
-            self.population_fitness[n] = self._check_fitness(self.population_individuals[n],
-                                                             self.population_fenotype[n])
-        return self.population_fitness
+            score= self._check_fitness(self.pop_ind[n], self.pop_fen[n])
+            #double-check the score
+            if score == 1:
+                fen = self.fenotype(ind)
+                score = self._check_fitness(self.pop_ind[n], self.pop_fen[n])
+
+            self.pop_fit[n] = score
+
+        return self.pop_fit
 
     @staticmethod
     def _pairing(mother,father):
@@ -180,26 +203,26 @@ class GenAlFeaturesSelector(object):
     def transform(self):
         """ Transform, i.e. execute an algorithm. """
 
-        self.population_individuals = [self._individual(self.population[n]) for n in
-                                       range(self.n_population)]
-        self.population_fenotype = [self.fenotype(individual) for individual in
-                                    self.population_individuals]
+        self.pop_ind = [self._individual(self.pop[n]) for n in
+                                       range(self.n_pop)]
+        self.pop_fen = [self.fenotype(individual) for individual in
+                                    self.pop_ind]
 
-        self.past_populations = self._population_fitness(self.population)
+        self.past_pop = self._pop_fit(self.pop)
 
 
-        self.best_fitness = np.max(self.past_populations)
+        self.best_fit = np.max(self.past_pop)
         self.n_generation = 0
         # for n in range(4):
 
         # For check, how does an algorithm performs, comment out line above,
         # and comment line below.
 
-        while self.best_fitness < self.desired_fitness:
+        while self.best_fit < self.desired_fit:
             self.descendants_generation()
             self.random_mutation()
             self.n_generation += 1
-            self.best_fitness = np.max(self._population_fitness(self.population))
+            self.best_fit = np.max(self._pop_fit(self.pop))
 
     def descendants_generation(self):
         """ Selects the best individuals, then generates new population, with
@@ -207,55 +230,59 @@ class GenAlFeaturesSelector(object):
         ts of parents) """
         #Two firsts individuals in descendants generation are the best individua
         #ls from previous generation
-        pop_fit = self._population_fitness(self.population)
+        pop_fit = self._pop_fit(self.pop)
         print("population fitness:")
         print(pop_fit)
-        self.past_populations = np.vstack([self.past_populations,pop_fit])
+        self.past_pop = np.vstack([self.past_pop,pop_fit])
         # #now,let's select best ones
-        self.population[:2] = self.population[np.argsort(pop_fit)][-2:]
-        print(self.population[:2])
-        self.population_individuals[0] = self.population_individuals[np.argsort(pop_fit).tolist()[self.n_population-1]]
-        self.population_individuals[1] = self.population_individuals[np.argsort(pop_fit).tolist()[self.n_population-2]]
+        self.pop[:2] = self.pop[np.argsort(pop_fit)][-2:]
+        print(self.pop[:2])
+        self.pop_ind[0] = self.pop_ind[np.argsort(pop_fit).tolist()[
+                                                                  self.n_pop-1]]
+        self.pop_ind[1] = self.pop_ind[np.argsort(pop_fit).tolist()[
+                                                                  self.n_pop-2]]
 
-        self.population_fenotype[0] = self.population_fenotype[np.argsort(pop_fit).tolist()[self.n_population-1]]
-        self.population_fenotype[1] = self.population_fenotype[np.argsort(pop_fit).tolist()[self.n_population-2]]
-        print(self._population_fitness(self.population))
+        self.pop_fen[0] = self.pop_fen[np.argsort(pop_fit).tolist()[
+                                                                  self.n_pop-1]]
+        self.pop_fen[1] = self.pop_fen[np.argsort(pop_fit).tolist()[
+                                                                  self.n_pop-2]]
+        print(self._pop_fit(self.pop))
         parents_pop = self.roulette()
         #Finally, we populate new generation by pairing randomly chosen best
         #individuals
-        for n in range(2,self.n_population-1):
-            father = parents_pop[np.random.randint(self.n_population)]
-            mother = parents_pop[np.random.randint(self.n_population)]
+        for n in range(2,self.n_pop-1):
+            father = parents_pop[np.random.randint(self.n_pop)]
+            mother = parents_pop[np.random.randint(self.n_pop)]
             children = self._pairing(mother,father)
-            self.population[(n)] = children[0]
-            self.population[(n)+1] = children[1]
-            self.population_individuals[n] = self._individual(self.population[n])
-            self.population_individuals[n+1] = self._individual(self.population[n+1])
-            self.population_fenotype[n] = self.fenotype(self.population_individuals[n])
-            self.population_fenotype[n+1] = self.fenotype(self.population_individuals[n+1])
+            self.pop[(n)] = children[0]
+            self.pop[(n)+1] = children[1]
+            self.pop_ind[n] = self._individual(self.pop[n])
+            self.pop_ind[n+1] = self._individual(self.pop[n+1])
+            self.pop_fen[n] = self.fenotype(self.pop_ind[n])
+            self.pop_fen[n+1] = self.fenotype(self.pop_ind[n+1])
 
     def random_mutation(self):
         """ Randomly mutates the population, for each individual it checks wheth
         er to do it accordingly to given probability, and then generates new cha
         racter on random locus """
-        population = self.population.copy()
-        for n in range(self.n_population):
+        population = self.pop.copy()
+        for n in range(self.n_pop):
             decision = np.random.random()
-            if decision < self.mutation_probability:
+            if decision < self.mut_prob:
                 which_gene = np.random.randint(self.n_genotype)
                 if population[n][which_gene] == 0:
                     population[n][which_gene] = self.get_gene()
                 else:
                     population[n][which_gene] = 1
-        self.population = population
+        self.pop = population
 
     def roulette_wheel(self):
         """ Method that returns roulette wheel, an array with shape [n_populatio
         n, low_individual_probability,high_individual_probability]"""
-        pop_fitness = self._population_fitness(self.population)
-        wheel = np.zeros((self.n_population,3))
+        pop_fitness = self._pop_fit(self.pop)
+        wheel = np.zeros((self.n_pop,3))
         prob = 0
-        for n in range(self.n_population):
+        for n in range(self.n_pop):
             ind_prob = prob + (pop_fitness[n] / np.sum(pop_fitness))
             wheel[n] = [n,prob,ind_prob]
             prob = ind_prob
@@ -273,18 +300,18 @@ class GenAlFeaturesSelector(object):
         """ This method performs selection of individuals, it takes the coeffici
         ent k, which is number of new individuals """
         wheel = self.roulette_wheel()
-        return np.array([self.population[self.roulette_swing(wheel)]
-                         for n in range(self.n_population)])
+        return np.array([self.pop[self.roulette_swing(wheel)]
+                         for n in range(self.n_pop)])
 
     def plot_fitness(self):
         """ It checks the mean fitness for each passed population and the fitnes
         s of best idividual, then plots it. """
-        self.past_populations = np.vstack([self.past_populations
-        ,self.population_fitness])
-        N = self.past_populations.shape[0]
+        self.past_pop = np.vstack([self.past_pop
+        ,self.pop_fit])
+        N = self.past_pop.shape[0]
         t = np.linspace(0,N,N)
-        past_fit_mean = [np.mean(self.past_populations[n]) for n in range(N)]
-        past_fit_max = [np.max(self.past_populations[n]) for n in range(N)]
+        past_fit_mean = [np.mean(self.past_pop[n]) for n in range(N)]
+        past_fit_max = [np.max(self.past_pop[n]) for n in range(N)]
         plt.plot(t,past_fit_mean,label='population mean fitness')
         plt.plot(t,past_fit_max,label='population best individual\'s fitness')
         plt.xlabel('Number of generations')
@@ -296,27 +323,17 @@ class GenAlFeaturesSelector(object):
 
 if __name__ == '__main__':
     bs = BakSys()
-
-    ga = GenAlFeaturesSelector(n_features=1,kfold=10)
+    ga = GenAlFeaturesSelector(n_features=1,kfold=3,desired_fit=0.9,
+    scaler=Normalizer(),mut_prob=0.02)
     data = load_dataset('datasetSUBJ1.npy')
-
     data,target = chunking(data)
     n_samples = target.shape[0]
     data = np.array([bs.fit_transform(data[n])
                           for n in range(n_samples)]).reshape(n_samples*3,256)
     target = np.array([[n,n,n] for n in target]).reshape(n_samples*3)
-
-    # data = load_dataset('data/dataset.npy')
-    # data,target = chunking(data)
-    # print(data.shape)
-    ga.fit(data,target)
-    # individual_uno = ga._individual(ga.population[0])
-    # fenotype = ga.fenotype(individual_uno)
-    # print(ga._check_fitness(individual_uno,fenotype))
-    ga.transform()
-    # print(ga._population_fitness(ga.population))
-    # ga.plot_fitness()
-
+    # ga.fit(data,target)
+    # ga.transform()
+    ga.fit_transform(data,target)
 
 """
 Now everything works too well. Think about scaling
