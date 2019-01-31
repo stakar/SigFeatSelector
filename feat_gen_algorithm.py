@@ -53,7 +53,7 @@ class GenAlFeaturesSelector(object):
         self.n_genotype = n_genotype
         self.scaler = scaler
         self.clf = clf
-        self.mlp = make_pipeline(self.scaler,)
+        self.mlp = make_pipeline(self.scaler,self.clf)
         self.mut_prob = mut_prob
         self.desired_fit = desired_fit
         self.kfold = kfold
@@ -143,7 +143,7 @@ class GenAlFeaturesSelector(object):
         dataset """
         #crate a placeholder for classifiers
         classifiers = list()
-        mlp = MLPClassifier()
+        mlp = self.mlp
         #for each fold of data
         for n in range(self.kfold):
             #fit it into model
@@ -183,7 +183,7 @@ class GenAlFeaturesSelector(object):
             #check it's fitness
             score= self._check_fitness(self.pop_ind[n], self.pop_fen[n])
             #double-check the score
-            if score == 1:
+            while score > 0.99:
                 fen = self.fenotype(ind)
                 score = self._check_fitness(self.pop_ind[n], self.pop_fen[n])
 
@@ -213,16 +213,18 @@ class GenAlFeaturesSelector(object):
 
         self.best_fit = np.max(self.past_pop)
         self.n_generation = 0
-        # for n in range(4):
+#         for n in range(100):
 
         # For check, how does an algorithm performs, comment out line above,
         # and comment line below.
 
-        while self.best_fit < self.desired_fit:
+        while (self.best_fit < self.desired_fit):
             self.descendants_generation()
             self.random_mutation()
             self.n_generation += 1
             self.best_fit = np.max(self._pop_fit(self.pop))
+            if (self.n_generation > 10):
+                break
 
     def descendants_generation(self):
         """ Selects the best individuals, then generates new population, with
@@ -231,7 +233,7 @@ class GenAlFeaturesSelector(object):
         #Two firsts individuals in descendants generation are the best individua
         #ls from previous generation
         pop_fit = self._pop_fit(self.pop)
-        print("population fitness:")
+#         print("population fitness:")
         print(pop_fit)
         self.past_pop = np.vstack([self.past_pop,pop_fit])
         # #now,let's select best ones
@@ -303,7 +305,7 @@ class GenAlFeaturesSelector(object):
         return np.array([self.pop[self.roulette_swing(wheel)]
                          for n in range(self.n_pop)])
 
-    def plot_fitness(self):
+    def plot_fitness(self,title='Algorithm performance'):
         """ It checks the mean fitness for each passed population and the fitnes
         s of best idividual, then plots it. """
         self.past_pop = np.vstack([self.past_pop
@@ -318,6 +320,8 @@ class GenAlFeaturesSelector(object):
         plt.ylabel('Fitness')
         plt.ylim([0,1])
         plt.legend()
+        plt.title(title)
+        plt.savefig(title)
         plt.show()
 
 
