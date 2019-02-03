@@ -112,7 +112,8 @@ class GenAlFeaturesSelector(object):
 
     def transform(self):
         """ Transform, i.e. execute an algorithm. """
-        self.past_pop = self._pop_fitness(self.pop)
+        self.pop_fit = self._pop_fitness(self.pop)
+        self.past_pop = self.pop_fit.copy()
         self.best_ind = np.max(self.past_pop)
         self.n_generation = 0
         # for n in range(10):
@@ -122,6 +123,10 @@ class GenAlFeaturesSelector(object):
 
         while self.best_ind < self.desired_fit:
             self.descendants_generation()
+            self.pop_fit = self._pop_fitness(self.pop)
+            if (self.n_generation % 50) == 0:
+                print(self.pop_fit)
+            self.best_ind = np.max(self.pop_fit)
             self.random_mutation()
             self.n_generation += 1
             if self.n_generation > self.max_gen:
@@ -139,10 +144,6 @@ class GenAlFeaturesSelector(object):
         ts of parents) """
         #Two firsts individuals in descendants generation are the best individua
         #ls from previous generation
-        self.pop_fit = self._pop_fitness(self.pop)
-        if (self.n_generation % 50) == 0:
-            print(self.pop_fit)
-        self.best_ind = np.max(self.pop_fit)
         self.past_pop = np.vstack([self.past_pop,self.pop_fit])
         self.pop[:2] = self.pop[np.argsort(self.pop_fit)][-2:]
         #now,let's select best ones
@@ -220,9 +221,9 @@ class GenAlFeaturesSelector(object):
 
 
 if __name__ == '__main__':
-    time_window=1
+    time_window=5
     bs = BakSys(threeclass=False,seconds=time_window)
-    ga = GenAlFeaturesSelector(n_pop=5,desired_fit=0.8)
+    ga = GenAlFeaturesSelector(n_pop=5,desired_fit=0.6,max_gen=10)
     data = load_dataset('datasetSUBJ1.npy')
     data,target = chunking(data,time_window=time_window)
     n_samples = target.shape[0]
@@ -230,9 +231,9 @@ if __name__ == '__main__':
     data = np.array([bs.fit_transform(data[n])
                           for n in range(n_samples)]).reshape(n_samples*2,freq*time_window)
     target = np.array([[n,n] for n in target]).reshape(n_samples*2)
-    print(data.shape)
-    ga.fit(data,target)
-    print(ga.pop)
+    # print(data.shape)
+    # ga.fit(data,target)
+    # print(ga.pop)
     # ga.transform()
 
 """
