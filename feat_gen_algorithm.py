@@ -8,12 +8,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import cross_val_score
 
-
-
-
 class GenAlFeaturesSelector(object):
 
-    def __init__(self,n_feat=1,n_pop=10,n_gen=17,
+    def __init__(self,n_pop=10,n_gen=17,
                  mut_prob=0.02,desired_fit=0.6,max_gen = 300,
                  scaler = MinMaxScaler(),
                  clf = MLPClassifier(random_state=42,max_iter=800,
@@ -22,29 +19,54 @@ class GenAlFeaturesSelector(object):
         """
         Features selector that uses Genetic Algorithm.
 
-        n_feat : int
-        number of features that are supposed to be extract
-
+        Parameters
+        ----------
         n_pop : int
         number of individuals in pop
 
-
         n_gen : int
-        length of genotype, i.e. range of features among which we ca
-        n select in fact, it is determined by maximal length of Chro
-        mosome's attribute genotype.
+        length of genotype, i.e. range of features among which we can select in
+        fact, it is determined by maximal length of Chromosome's attribute genot
+        ype.
+
+        scaler : class
+        sklearn scaler used for scalling data
+
+        clf : class
+        sklearn classifier used for classification
+
+        mut_prob : float
+        probability of mutation, default 0.02
+
+        desired_fit : float
+        accuracy that has to be achieved for algorithm to stop
+
+        max_gen
+        maximum number of generation. The threshold that is not supposed to cros
+        sed, the limit of algorithm. It is safety limit, that one can moderate,
+        so algorithm does not work forever.
+
+        Attributes
+        ----------
+
+        pop : array [n_pop,n_gen]
+        placeholder array for population with shape [number of individuals, num
+        ber of features]
+
+        pipeline : Pipeline
+        Pipeline object, created using make_pipeline function from sklearn, taki
+        ng as steps scaler and classifier passed as parameters
 
         """
 
         self.self = self
-        self.n_feat = n_feat
         self.n_pop = n_pop
         self.n_gen = n_gen
         self.pop = np.zeros((n_pop,n_gen))
         self.scaler = scaler
         self.clf = clf
-        self.mlp = make_pipeline(self.scaler,self.clf)
-        # self.mlp = self.clf
+        self.pipeline = make_pipeline(self.scaler,self.clf)
+        # self.pipeline = self.clf
         self.mut_prob = mut_prob
         self.desired_fit = desired_fit
         self.max_gen = max_gen
@@ -65,16 +87,23 @@ class GenAlFeaturesSelector(object):
         offline data, consists of samples, i.e. transformed by BakardjianSystem
         EEG signal
 
+        target : array [n_samples]
+
+        array of targetted values, i.e. decision attributes, for each individual
+
         """
         #Firstly, let's shuffle the data
         order = np.random.permutation(np.arange(data.shape[0]))
         self.data = data[order]
         self.target = target[order]
 
-        #Creates a random pop
+        #Creates individuals
         for n in range(self.n_pop):
-            self.pop[n][np.random.randint(0,self.n_gen,
-                               self.n_feat)] = self.get_gene()
+            #randomly decide number of used features
+            n_feat = np.random.randint(0,self.n_gen)
+            #now, randomly choose the locuses of features
+            locus_feat = np.random.randint(0,self.n_gen,n_feat)
+            self.pop[n][locus_feat] = self.get_gene()
 
     def _check_fitness(self,genotype):
         """ Check the fitness of given individual, by creating a new dataset,
@@ -89,9 +118,12 @@ class GenAlFeaturesSelector(object):
         fen_train = np.array([chrom.fit_transform(self.data[n])
                              for n in range(self.data.shape[0])],dtype='float64')
         #return fitness, i.e accuracy of model
-        score = np.mean(cross_val_score(self.mlp,fen_train,self.target,cv=5))
+        score = np.mean(cross_val_score(self.pipeline,fen_train,self.target,cv=5))
+        #THe part below is double-checkc. Sometimes classifier is too good, then
+        #it is necessary to turn it into plausible one.
         while score > 0.99:
-            score = np.mean(cross_val_score(self.mlp,fen_train,self.target,cv=5))
+            score = np.mean(cross_val_score(self.pipeline,fen_train,self.target,cv=5))
+        #Output is a rounded to 2 decimal points score.
         return round(score,2)
 
 
@@ -111,7 +143,23 @@ class GenAlFeaturesSelector(object):
         return child1,child2
 
     def transform(self):
-        """ Transform, i.e. execute an algorithm. """
+        """ Transform, i.e. execute an algorithm.
+
+        attributes
+        ----------
+        pop_fit : list
+        list of population's fitness, i.e. fitness of each individual
+
+        past_pop : array [n_generation,len(pop_fit)]
+        past population's fitnesses
+
+        best_ind : float
+        best founded fitness
+
+        n_generation : int
+        number of generation already created
+
+        """
         self.pop_fit = self._pop_fitness(self.pop)
         self.past_pop = self.pop_fit.copy()
         self.best_ind = np.max(self.past_pop)
@@ -124,7 +172,7 @@ class GenAlFeaturesSelector(object):
         while self.best_ind < self.desired_fit:
             self.descendants_generation()
             self.pop_fit = self._pop_fitness(self.pop)
-            if (self.n_generation % 50) == 0:
+            if (self.n_generation % 1) == 0:
                 print(self.pop_fit)
             self.best_ind = np.max(self.pop_fit)
             self.random_mutation()
@@ -203,7 +251,15 @@ class GenAlFeaturesSelector(object):
 
     def plot_fitness(self,title='Algorithm performance'):
         """ It checks the mean fitness for each passed pop and the fitnes
-        s of best idividual, then plots it. """
+        s of best idividual, then plots it. It does not show the plotted figure,
+        (unless last line is uncommented), but instead saves the plot under pass
+        ed title
+
+        Parameters
+        ----------
+        title : string
+        title of plot, under which it is saved
+        """
         N = self.past_pop.shape[0]
         t = np.linspace(0,N,N)
         past_fit_mean = [np.mean(self.past_pop[n]) for n in range(N)]
@@ -223,17 +279,18 @@ class GenAlFeaturesSelector(object):
 if __name__ == '__main__':
     time_window=5
     bs = BakSys(threeclass=False,seconds=time_window)
-    ga = GenAlFeaturesSelector(n_pop=5,desired_fit=0.6,max_gen=10)
+    ga = GenAlFeaturesSelector(n_pop=5,desired_fit=0.1,max_gen=3)
     data = load_dataset('datasetSUBJ1.npy')
     data,target = chunking(data,time_window=time_window)
     n_samples = target.shape[0]
     freq = 256
     data = np.array([bs.fit_transform(data[n])
-                          for n in range(n_samples)]).reshape(n_samples*2,freq*time_window)
+                    for n in range(n_samples)]).reshape(n_samples*2,
+                                                               freq*time_window)
     target = np.array([[n,n] for n in target]).reshape(n_samples*2)
     # print(data.shape)
-    # ga.fit(data,target)
-    # print(ga.pop)
+    ga.fit(data,target)
+    print(ga.pop)
     # ga.transform()
 
 """
