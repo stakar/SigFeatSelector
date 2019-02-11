@@ -106,7 +106,7 @@ class CreateDataset():
 
 
 if __name__ == "__main__":
-    for n in range(1,2):
+    for n in range(1,5):
         dc = CreateDataset(target = {'8':0,'14':1},subject='SUBJ{}'.format(n),
                            target_file_name='datasetSUBJ{}.npy'.format(n))
         dc.run()
