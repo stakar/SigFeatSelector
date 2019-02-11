@@ -55,7 +55,7 @@ class CreateDataset():
         path to the file in which is the data to which array is supposed to fits
         """
         #load data
-        x = np.loadtxt(path,delimiter = ',')
+        x = np.genfromtxt(path,delimiter = ',')
         #cut unnecessary parts (the stimuli was present 5-20 seconds)
         x = x[5*self.freq:20*self.freq]
 
