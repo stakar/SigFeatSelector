@@ -40,7 +40,7 @@ subj4_raw = load_dataset('datasetSUBJ4.npy')
 
 n_population = 10
 desired_fitness = 0.95,
-max_generation = 1000
+max_generation = 100000
 clf = MLPClassifier(max_iter=800,random_state=42,tol=1e-3)
 
 gafeat = GenAlFeaturesSelector(n_pop=n_population,max_gen=max_generation,
