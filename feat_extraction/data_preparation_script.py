@@ -86,6 +86,7 @@ class CreateDataset():
         #add to the dataset
         for key in self._target.keys():
             dir_list = [n for n in os.listdir() if '_{}'.format(key) in n]
+            dir_list = [n for n in dir_list if self.subject in n]
             for z in dir_list:
                 print(z)
                 t = self._create_array(z)
