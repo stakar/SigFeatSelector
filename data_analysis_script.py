@@ -38,37 +38,45 @@ subj4_raw = load_dataset('datasetSUBJ4.npy')
 
 #Setting parameters
 
-n_population = 10
+n_population = 5
 desired_fitness = 0.95,
-max_generation = 100000
-clf = MLPClassifier(max_iter=800,random_state=42,tol=1e-3)
+max_generation = 10000
+clf = MLPClassifier(max_iter=200,random_state=42,tol=1e-2)
+scaler = MinMaxScaler()
 
 gafeat = GenAlFeaturesSelector(n_pop=n_population,max_gen=max_generation,
-                               desired_fit=desired_fitness,clf=clf)
+                               desired_fit=desired_fitness,
+                               scaler = scaler,clf=clf)
 
 #for each time window perform analysis
 
-for t_window in range(1,6):
+for t_window in range(1,5):
     time_window = t_window
 
     tmp_results = list()
 
     bs = BakSys(threeclass=False,seconds = time_window)
 
-    subj1 = preprocessing(subj1_raw,'subject 1 data',256,bs,time_window = time_window)
-    subj2 = preprocessing(subj2_raw,'subject 2 data',256,bs,time_window = time_window)
-    subj3 = preprocessing(subj3_raw,'subject 3 data',256,bs,time_window = time_window)
-    subj4 = preprocessing(subj4_raw,'subject 4 data',256,bs,time_window = time_window)
+    subj1 = preprocessing(subj1_raw,'subject 1 data',256,bs,n_class = 2,
+                          time_window = time_window)
+    subj2 = preprocessing(subj2_raw,'subject 2 data',256,bs,n_class = 2,
+                          time_window = time_window)
+    subj3 = preprocessing(subj3_raw,'subject 3 data',256,bs,
+                          time_window = time_window)
+    subj4 = preprocessing(subj4_raw,'subject 4 data',256,bs,
+                          time_window = time_window)
     overall = (np.vstack([subj1[0],subj2[0],subj3[0],subj4[0]]),
                np.hstack([subj1[1],subj2[1],subj3[1],subj4[1]]),
                subj1[2],'overall data')
 
-    for n in [subj1,subj2,subj3,subj4,overall]:
+    # for n in [subj1,subj2,subj3,subj4,overall]:
+    for n in [subj1,subj2]:
         tmp = subroutine(n,time_window,gafeat)
         tmp_results.append(tmp)
 
     df_results = summary = pd.DataFrame(columns=list(tmp_results[0].keys()),
              index=['Subject 1','Subject 2','Subject 3','Subject 4','Overall'],
+             # index = ['Subj1','Subj2'],
              data=tmp_results)
 
     df_results.to_csv('results_{}.csv'.format(t_window))
