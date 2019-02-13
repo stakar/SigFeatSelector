@@ -34,15 +34,20 @@ class Chromosome():
         self.genotype = genotype
         self.freq = freq
 
+        self.genes_description = ['lat','amp','lar','aamp','alar',
+        'par','nar','tar','atar','taar','aass',
+        'pp','ppt','pps','zc','zcd','ssa']
+
     def fit(self,signal):
         """ Fits the model to signal """
         self.signal = signal
 
-        genes = [self.lat,self.amp,self.lar,self.aamp,self.alar,
+        self.genes = [self.lat,self.amp,self.lar,self.aamp,self.alar,
         self.par,self.nar,self.tar,self.atar,self.taar,self.aass,
         self.pp,self.ppt,self.pps,self.zc,self.zcd,self.ssa]
 
-        self.chromosome = [round(genes[n](),2) for n in
+
+        self.chromosome = [round(self.genes[n](),2) for n in
                            range(17) if self.genotype[n] > 0]
 
     def transform(self,signal):
@@ -64,7 +69,9 @@ class Chromosome():
 
     def lar(self):
         """ Returns latency to amplitude ratio """
-        return self.lat()/self.amp()
+        lat = self.lat()
+        amp = self.amp()
+        return lat/amp
 
     def aamp(self):
         """ Returns absolute amplitude of signal """

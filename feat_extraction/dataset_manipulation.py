@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def load_dataset(*argv):
     """ Loads dataset from given path, if it is not passed, then asked for it"""
     if len(argv)>0:
@@ -13,12 +14,13 @@ def chunking(dataset,time_window=1,freq=256):
         n_samples,n_channels,freq*time_window """
     target = dataset[:,-1:]
     data = dataset[:,:-1]
-    n_iter = int(dataset.shape[0]/(freq*time_window))
+    n_iter = int(data.shape[0]/(freq*time_window))
 # line below creates dataset with shape n_samples (i.e. number of iterations,
 # number of instances), n_channels (number of channels, un data I am woriking
 # with it is 128 active electrodes, and freq*time_window (for each instance n
 # umber of seconds and samples for each seconds))
-    data = np.array([data[(n*freq):(n*freq)+freq,:]
-                     for n in range(n_iter)]).reshape(n_iter,128,freq)
-    target = np.array([target[n*256] for n in range(n_iter)])
+    len_data = freq*time_window
+    data = np.array([data[(n*len_data):(n*len_data)+len_data,:]
+                     for n in range(n_iter)]).reshape(n_iter,128,len_data)
+    target = np.array([target[n*len_data] for n in range(n_iter)])
     return data,target
