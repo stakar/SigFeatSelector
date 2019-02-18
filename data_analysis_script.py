@@ -69,8 +69,8 @@ for t_window in range(1,5):
                np.hstack([subj1[1],subj2[1],subj3[1],subj4[1]]),
                subj1[2],'overall data')
 
-    # for n in [subj1,subj2,subj3,subj4,overall]:
-    for n in [subj1,subj2]:
+     for n in [subj1,subj2,subj3,subj4,overall]:
+    #for n in [subj1,subj2]:
         tmp = subroutine(n,time_window,gafeat)
         tmp_results.append(tmp)
 
