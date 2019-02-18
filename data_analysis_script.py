@@ -38,7 +38,7 @@ subj4_raw = load_dataset('datasetSUBJ4.npy')
 
 #Setting parameters
 
-n_population = 5
+n_population = 10
 desired_fitness = 0.95,
 max_generation = 10000
 clf = MLPClassifier(max_iter=200,random_state=42,tol=1e-2)
