@@ -1,5 +1,5 @@
-# Sig_Feat_Selector
-Project for EEG signal's features extractor that uses Genetic Algorithm.
+# SigFeatSelector
+Project for EEG signal's features extractor that uses Genetic Algorithm. Used for data analysis purposes in Master's Degree Thesis
 
 ## Introduction
 
@@ -13,7 +13,7 @@ numpy
 sklearn
 
 ## Progress
-Right now I finished first version of code and started analyzing data.
+Finished
 
 ## References
 
